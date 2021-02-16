@@ -1,0 +1,111 @@
+service: sls-examples
+
+plugins:
+  - serverless-pseudo-parameters
+  - serverless-python-requirements
+  - serverless-apigateway-service-proxy
+  
+
+custom:
+  repoName: hook
+  resourcesName: ${self:service}-${opt:stage}
+  apiGatewayServiceProxies:
+    - sqs:
+        path: /hook/receive_data
+        method: post
+        queueName: 
+          Fn::GetAtt: 
+            - HookReceiveDataQueue
+            - QueueName
+        cors: true
+        request:
+          template:
+            application/json:
+              Fn::Join:
+                - ''
+                - 
+                  - 'QueueUrl='
+                  - Ref: HookReceiveDataQueue
+                  - '&'
+                  - Action=SendMessage&
+                  - MessageBody=${file(deploy/api_mapping_template.vtl)}
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: ${opt:stage}
+  region: ${opt:region, 'us-west-2'}
+  cfLogs: true
+  logs:
+    restApi:
+      accessLogging: true
+      executionLogging: true
+      level: INFO
+      fullExecutionData: true
+  tracing: 
+    apiGateway: true
+    lambda: true
+  versionFunctions: false
+  environment:
+    stage: ${self:provider.stage}
+    region: ${self:provider.region}
+    repoName: ${self:service}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+        - ec2:CreateNetworkInterface
+        - ec2:DescribeNetworkInterfaces
+        - ec2:DeleteNetworkInterface
+        - xray:PutTraceSegments
+        - xray:PutTelemetryRecords
+      Resource: '*'
+
+resources:
+  Resources:
+    HookReceiveDataQueueDeadLetter:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.resourcesName}-receive-data-dead-letter
+        MessageRetentionPeriod: 1209600
+
+    HookReceiveDataQueue:
+      Type: AWS::SQS::Queue
+      DependsOn: HookReceiveDataQueueDeadLetter
+      Properties:
+        QueueName: ${self:custom.resourcesName}-receive-data
+        VisibilityTimeout: 300
+        RedrivePolicy:
+          deadLetterTargetArn: 
+            Fn::GetAtt:
+              - HookReceiveDataQueueDeadLetter
+              - Arn
+          maxReceiveCount: 4
+
+functions:
+  hookReceiveData:
+    timeout: 30
+    layers:
+       - arn:aws:lambda:#{AWS::Region}:580247275435:layer:LambdaInsightsExtension:12
+    handler: functions/hook_handler.receive_data
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - HookReceiveDataQueue
+              - Arn
+          batchSize: 1
+
+
+package:
+  excludeDevDependencies: true
+  exclude:
+    - .env/**
+    - tests/**
+    - deploy/**
+    - downloads/**
+    - operational_coding/**
+    
+

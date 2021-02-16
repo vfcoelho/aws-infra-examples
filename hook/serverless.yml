@@ -75,7 +75,7 @@ resources:
       Type: AWS::SQS::Queue
       DependsOn: HookReceiveDataQueueDeadLetter
       Properties:
-        QueueName: ${self:custom.resourcesName}-receive-data
+        QueueName: ${self:custom.resourcesName}-receive-data-queue
         VisibilityTimeout: 300
         RedrivePolicy:
           deadLetterTargetArn: 
@@ -83,6 +83,26 @@ resources:
               - HookReceiveDataQueueDeadLetter
               - Arn
           maxReceiveCount: 4
+    
+    HookReceiveDataTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: ${self:custom.resourcesName}-receive-data-topic
+
+    HookReceiveDataSubscription:
+      Type: AWS::SNS::Subscription
+      DependsOn: HookReceiveDataQueue
+      Properties:
+        Protocol: sqs
+        Endpoint: 
+          Fn::GetAtt:
+            - HookReceiveDataQueue
+            - Arn
+        TopicArn: 
+          Ref: HookReceiveDataTopic
+        FilterPolicy: 
+          status: 
+            - ok
 
 functions:
   hookReceiveData:

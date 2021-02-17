@@ -25,6 +25,6 @@ def main():
 
 
 if __name__ == "__main__":
-    log.info(f'Job Started in {os.environ["repoName"]} repo, at {os.environ["stage"]} stage')
+    log.info(f'Job Started in {os.environ["repoName"]} repo, at {os.environ["stage"]} stage for context {os.environ["context"]}.')
     main()
     log.info('Job Finished!')

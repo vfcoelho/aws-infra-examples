@@ -120,6 +120,9 @@ resources:
               -
                 Name: dataSourceDateLimit
                 Value: '1970-01-01 00:00:00+00:00'
+              -
+                Name: context
+                Value: 'Zero'
             LogConfiguration:
               LogDriver: awslogs
               Options:

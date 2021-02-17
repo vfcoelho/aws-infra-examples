@@ -8,7 +8,7 @@ plugins:
 
 custom:
   repoName: hook
-  resourcesName: ${self:service}-${opt:stage}
+  resourcesName: ${self:service}-${self:provider.stage}
   apiGatewayServiceProxies:
     - sqs:
         path: /hook/receive_data

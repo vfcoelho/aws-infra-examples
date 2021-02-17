@@ -41,6 +41,10 @@ provider:
         - xray:PutTraceSegments
         - xray:PutTelemetryRecords
       Resource: '*'
+    - Effect: Allow
+      Action:
+        - sqs:ReceiveMessage
+      Resource: '*'
 
 functions:
   poolingGetData:

@@ -1,0 +1,151 @@
+service: sls-examples
+
+plugins:
+  - serverless-pseudo-parameters
+  - serverless-python-requirements
+
+custom:
+  repoName: extractor
+  resourcesName: ${self:service}-${opt:stage}
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: ${opt:stage}
+  region: ${opt:region, 'us-west-2'}
+  cfLogs: true
+
+
+resources:
+  Resources:
+    IAMGeneralRole:
+      Type: AWS::IAM::Role
+      Properties: 
+        AssumeRolePolicyDocument: 
+          Version: '2012-10-17'
+          Statement:
+            - 
+              Effect: Allow
+              Principal:
+                Service:
+                  - ecs-tasks.amazonaws.com
+              Action: 'sts:AssumeRole'
+        Path: /
+        Policies:
+          -
+            PolicyName: ${self:custom.resourcesName}-IAMGeneralPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                
+                - 
+                  Effect: Allow
+                  Action: 
+                    - "ecr:GetAuthorizationToken"
+                    - "ecr:BatchCheckLayerAvailability"
+                    - "ecr:GetDownloadUrlForLayer"
+                    - "ecr:BatchGetImage"
+                    - "logs:CreateLogStream"
+                    - "logs:PutLogEvents"
+                  Resource: 
+                    - "*"
+    IAMCWTaskSchedulerRole:
+      Type: AWS::IAM::Role
+      Properties: 
+        AssumeRolePolicyDocument: 
+          Version: '2012-10-17'
+          Statement:
+            - 
+              Effect: Allow
+              Principal:
+                Service:
+                  - events.amazonaws.com
+              Action: 'sts:AssumeRole'
+        Path: /
+        Policies:
+          -
+            PolicyName: ${self:custom.resourcesName}
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - 
+                  Effect: Allow
+                  Action:
+                    - ecs:RunTask
+                  Resource:
+                    - arn:aws:ecs:*:#{AWS::AccountId}:task-definition/${self:custom.resourcesName}-*:*
+                  Condition:
+                    ArnLike:
+                      ecs:cluster: arn:aws:ecs:*:#{AWS::AccountId}:cluster/${self:custom.resourcesName}
+                - 
+                  Effect: Allow
+                  Action: iam:PassRole
+                  Resource:
+                    - "*"
+                  Condition:
+                    StringLike:
+                      iam:PassedToService: ecs-tasks.amazonaws.com
+    ECRRepository:
+      Type: AWS::ECR::Repository
+      Properties: 
+        RepositoryName: ${self:custom.resourcesName}
+    ECSCluster:
+      Type: AWS::ECS::Cluster
+      Properties: 
+        ClusterName: ${self:custom.resourcesName}
+    ECSTaskDefinitionWorker:
+      Type: AWS::ECS::TaskDefinition
+      Properties: 
+        ExecutionRoleArn: 
+          Ref: IAMGeneralRole
+        Family: ${self:custom.resourcesName}-worker
+        Cpu: 256
+        Memory: 512
+        NetworkMode: awsvpc
+        RequiresCompatibilities: 
+          - FARGATE
+        TaskRoleArn: 
+          Ref: IAMGeneralRole
+        ContainerDefinitions: 
+          - 
+            Name: ${self:custom.resourcesName}-worker
+            Image: '#{AWS::AccountId}.dkr.ecr.${self:provider.region}.amazonaws.com/${self:custom.resourcesName}'
+            Environment:
+              -
+                Name: stage
+                Value: ${self:provider.stage}
+              -
+                Name: repoName
+                Value: ${self:custom.repoName}
+              -
+                Name: dataSourceDateLimit
+                Value: '1970-01-01 00:00:00+00:00'
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: '/ecs/${self:custom.resourcesName}-worker'
+                awslogs-region: ${self:provider.region}
+                awslogs-stream-prefix: ecs
+    CWEventsRuleWorker:
+      Type: AWS::Events::Rule
+      DependsOn: ECSTaskDefinitionWorker
+      Properties: 
+        Name: ${self:custom.resourcesName}-worker
+        ScheduleExpression: "cron(0 6 * * ? *)"
+        State: DISABLED
+        Targets: 
+          - 
+            Id: ${self:custom.resourcesName}
+            Arn: 
+              Fn::GetAtt:
+                - ECSCluster
+                - Arn
+            RoleArn: 
+              Fn::GetAtt:
+                - IAMCWTaskSchedulerRole
+                - Arn
+            EcsParameters:
+              LaunchType: FARGATE
+              TaskDefinitionArn: 
+                Ref: ECSTaskDefinitionWorker
+              

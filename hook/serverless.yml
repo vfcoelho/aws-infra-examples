@@ -68,6 +68,11 @@ provider:
         - xray:PutTraceSegments
         - xray:PutTelemetryRecords
       Resource: '*'
+    - Effect: Allow
+      Action:
+        - sns:Subscribe
+        - sqs:ReceiveMessage
+      Resource: '*'
 
 resources:
   Resources:

@@ -1,4 +1,4 @@
-service: sls-examples
+service: sls-examples-${self:custom.repoName}
 
 plugins:
   - serverless-pseudo-parameters
@@ -49,8 +49,6 @@ provider:
 functions:
   poolingGetData:
     timeout: 30
-    layers:
-       - arn:aws:lambda:#{AWS::Region}:580247275435:layer:LambdaInsightsExtension:12
     environment:
       dataSourceDateLimit: '1970-01-01 00:00:00+00:00'
     handler: functions/pooling_handler.get_data

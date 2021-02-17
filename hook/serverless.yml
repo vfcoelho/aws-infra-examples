@@ -34,8 +34,8 @@ custom:
 provider:
   name: aws
   runtime: python3.8
-  stage: ${opt:stage}
-  region: ${opt:region, 'us-west-2'}
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
   cfLogs: true
   apiGateway:
     apiKeys:

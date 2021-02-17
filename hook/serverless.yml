@@ -1,4 +1,4 @@
-service: sls-examples
+service: sls-examples-${self:custom.repoName}
 
 plugins:
   - serverless-pseudo-parameters
@@ -118,8 +118,6 @@ resources:
 functions:
   hookReceiveData:
     timeout: 30
-    layers:
-       - arn:aws:lambda:#{AWS::Region}:580247275435:layer:LambdaInsightsExtension:12
     handler: functions/hook_handler.receive_data
     events:
       - sqs:

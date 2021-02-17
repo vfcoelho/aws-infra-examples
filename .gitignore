@@ -4,6 +4,7 @@ Pipfile.lock
 package-lock.json
 .serverless/
 .vscode
+vendored/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

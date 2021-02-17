@@ -18,6 +18,7 @@ custom:
             - HookReceiveDataQueue
             - QueueName
         cors: true
+        private: true
         request:
           template:
             application/json:
@@ -36,6 +37,11 @@ provider:
   stage: ${opt:stage}
   region: ${opt:region, 'us-west-2'}
   cfLogs: true
+  apiGateway:
+    apiKeys:
+      - 
+        name: slsExampleHookTestKey
+        value: sls_example_hook_test_key_value
   logs:
     restApi:
       accessLogging: true

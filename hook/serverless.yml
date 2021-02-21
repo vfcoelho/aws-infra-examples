@@ -1,11 +1,8 @@
 service: sls-examples-${self:custom.repoName}
 
 plugins:
-  - serverless-pseudo-parameters
-  - serverless-python-requirements
   - serverless-apigateway-service-proxy
   
-
 custom:
   repoName: hook
   resourcesName: ${self:service}-${self:provider.stage}
@@ -36,12 +33,16 @@ provider:
   runtime: python3.8
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-east-1'}
-  cfLogs: true
-  apiGateway:
-    apiKeys:
-      - 
-        name: slsExampleHookTestKey
-        value: sls_example_hook_test_key_value
+  # apiGateway:
+  #   apiKeySourceType: HEADER
+  #   apiKeys:
+  #     - 
+  #       description: slsExampleHookTestKey
+  #       value: sls_example_hook_test_key_value
+  #   usagePlan:
+  #       throttle:
+  #         burstLimit: 200
+  #         rateLimit: 100
   logs:
     restApi:
       accessLogging: true
@@ -84,7 +85,8 @@ resources:
 
     HookReceiveDataQueue:
       Type: AWS::SQS::Queue
-      DependsOn: HookReceiveDataQueueDeadLetter
+      DependsOn: 
+        - HookReceiveDataQueueDeadLetter
       Properties:
         QueueName: ${self:custom.resourcesName}-receive-data-queue
         VisibilityTimeout: 300
@@ -102,7 +104,8 @@ resources:
 
     HookReceiveDataSubscription:
       Type: AWS::SNS::Subscription
-      DependsOn: HookReceiveDataQueue
+      DependsOn: 
+        - HookReceiveDataQueue
       Properties:
         Protocol: sqs
         Endpoint: 
@@ -126,6 +129,11 @@ functions:
               - HookReceiveDataQueue
               - Arn
           batchSize: 1
+      # - http:
+      #     path: hook2
+      #     method: post
+      #     cors: true
+      #     private: true
 
 
 package:
@@ -136,5 +144,6 @@ package:
     - deploy/**
     - downloads/**
     - operational_coding/**
+    - node_modules/**
     
 

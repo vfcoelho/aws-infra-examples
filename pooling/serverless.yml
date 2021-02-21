@@ -7,13 +7,13 @@ plugins:
 
 custom:
   repoName: pooler
-  resourcesName: ${self:service}-${opt:stage}
+  resourcesName: ${self:service}-${self:provider.stage}
 
 provider:
   name: aws
   runtime: python3.8
-  stage: ${opt:stage}
-  region: ${opt:region, 'us-west-2'}
+  stage: ${opt:stage, 'develop'}
+  region: ${opt:region, 'us-east-1'}
   cfLogs: true
   logs:
     restApi:
@@ -59,7 +59,7 @@ stepFunctions:
       events:
         - schedule: 
             name: ${self:custom.resourcesName}-steps-scheduler
-            rate: rate(1 minutes)
+            rate: rate(1 minute)
             enabled: false #disabled for the sake of saving resources while deploying this example
             input:
               variable: 'Example Input'
@@ -72,7 +72,7 @@ stepFunctions:
             Type: Task
             Resource: 
               Fn::GetAtt:
-                - poolingGetDataLambdaFunction
+                - poolingGetData
                 - Arn
             ResultPath: $.taskresult
             Next: checkEventsRetrieved
@@ -82,7 +82,7 @@ stepFunctions:
               -
                 Variable: $.taskresult
                 NumericGreaterThan: 0
-                Next: orderEventsPool
+                Next: getData
             Default: WorkflowEnd
           WorkflowEnd:
             Type: Pass

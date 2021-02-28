@@ -11,7 +11,7 @@ class DataSource():
     def get_data(cls):
         limit_date = parser.parse(os.environ.get('dataSourceDateLimit'))
         now = datetime.utcnow()
-        now.replace(tzinfo=tzutc())
+        now = now.replace(tzinfo=tzutc())
         result = []
         if limit_date > now:
             items = round(random.random()/2,1)*10

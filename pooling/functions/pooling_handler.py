@@ -1,5 +1,5 @@
 
-from lib.data_generator import DataSource
+from libs.data_generator import DataSource
 
 import logging
 logging.basicConfig()

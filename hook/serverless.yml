@@ -15,7 +15,7 @@ custom:
             - HookReceiveDataQueue
             - QueueName
         cors: true
-        private: true
+        private: false
         request:
           template:
             application/json:
@@ -89,13 +89,13 @@ resources:
         - HookReceiveDataQueueDeadLetter
       Properties:
         QueueName: ${self:custom.resourcesName}-receive-data-queue
-        VisibilityTimeout: 300
+        VisibilityTimeout: 30
         RedrivePolicy:
           deadLetterTargetArn: 
             Fn::GetAtt:
               - HookReceiveDataQueueDeadLetter
               - Arn
-          maxReceiveCount: 4
+          maxReceiveCount: 1
     
     HookReceiveDataTopic:
       Type: AWS::SNS::Topic

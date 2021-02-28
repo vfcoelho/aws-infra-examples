@@ -117,6 +117,31 @@ resources:
         FilterPolicy: 
           status: 
             - ok
+    
+    SQSGeneralPolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - Ref: HookReceiveDataQueue
+        PolicyDocument:
+          Version: '2008-10-17'
+          Id: PublicationPolicy
+          Statement:
+            - Sid: Allow-SNS-SendMessage
+              Effect: Allow
+              Principal:
+                AWS: '*'
+              Action: 
+                - sqs:SendMessage
+              Resource: 
+                Fn::GetAtt:
+                  - HookReceiveDataQueue
+                  - Arn
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: 
+                    - Ref: HookReceiveDataTopic
+            
 
 functions:
   hookReceiveData:

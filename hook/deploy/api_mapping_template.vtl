@@ -4,7 +4,7 @@
 ##  For the default template, aws api gateway console can provide an example when trying to set this template manually
 #set($allParams = $input.params())
 {
-"type": "Hook",
+"Type": "Hook",
 "body" : $input.body,
 "queryStringParameters":{
     #set($params = $allParams.get("querystring"))

@@ -1,17 +1,17 @@
-service: sls-examples
+service: sls-examples-${self:custom.repoName}
 
 plugins:
   - serverless-pseudo-parameters
-  - serverless-python-requirements
+  # - serverless-python-requirements
 
 custom:
   repoName: extractor
-  resourcesName: ${self:service}-${opt:stage}
+  resourcesName: ${self:service}-${self:provider.stage}
 
 provider:
   name: aws
   runtime: python3.8
-  stage: ${opt:stage}
+  stage: ${opt:stage, 'develop'}
   region: ${opt:region, 'us-east-1'}
   cfLogs: true
 
@@ -119,7 +119,7 @@ resources:
                 Value: ${self:custom.repoName}
               -
                 Name: dataSourceDateLimit
-                Value: '1970-01-01 00:00:00+00:00'
+                Value: '2021-03-01 01:00:00-03:00'
               -
                 Name: context
                 Value: 'Zero'
@@ -129,12 +129,16 @@ resources:
                 awslogs-group: '/ecs/${self:custom.resourcesName}-worker'
                 awslogs-region: ${self:provider.region}
                 awslogs-stream-prefix: ecs
+    CWPaymentsLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: "/ecs/${self:custom.resourcesName}-worker"
     CWEventsRuleWorker:
       Type: AWS::Events::Rule
       DependsOn: ECSTaskDefinitionWorker
       Properties: 
         Name: ${self:custom.resourcesName}-worker
-        ScheduleExpression: "cron(0 6 * * ? *)"
+        ScheduleExpression: "rate(5 minutes)"
         State: DISABLED
         Targets: 
           - 
@@ -149,6 +153,26 @@ resources:
                 - Arn
             EcsParameters:
               LaunchType: FARGATE
-              TaskDefinitionArn: 
-                Ref: ECSTaskDefinitionWorker
-              
+              TaskDefinitionArn: '#{ECSTaskDefinitionWorker}'
+              NetworkConfiguration:
+                AwsVpcConfiguration:
+                  AssignPublicIp: ENABLED
+                  SecurityGroups:
+                    - "sg-10386960"
+                  Subnets:
+                    - "subnet-0605555c"
+                    - "subnet-962dfaf2"
+
+
+
+package:
+  excludeDevDependencies: false
+  exclude:
+    - .env/**
+    - tests/**
+    - deploy/**
+    - downloads/**
+    - operational_coding/**
+    - vendored/**
+    - workers/**
+    - legacy/**

@@ -1,0 +1,101 @@
+service: sls-examples-${self:custom.repoName}
+
+plugins:
+  - serverless-pseudo-parameters
+  - serverless-step-functions
+  - serverless-python-requirements
+
+custom:
+  repoName: pooler
+  resourcesName: ${self:service}-${self:provider.stage}
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: ${opt:stage, 'develop'}
+  region: ${opt:region, 'us-east-1'}
+  cfLogs: true
+  logs:
+    restApi:
+      accessLogging: true
+      executionLogging: true
+      level: INFO
+      fullExecutionData: true
+  tracing: 
+    apiGateway: true
+    lambda: true
+  versionFunctions: false
+  environment:
+    stage: ${self:provider.stage}
+    region: ${self:provider.region}
+    repoName: ${self:service}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+        - ec2:CreateNetworkInterface
+        - ec2:DescribeNetworkInterfaces
+        - ec2:DeleteNetworkInterface
+        - xray:PutTraceSegments
+        - xray:PutTelemetryRecords
+      Resource: '*'
+    - Effect: Allow
+      Action:
+        - sqs:ReceiveMessage
+      Resource: '*'
+
+functions:
+  poolingGetData:
+    timeout: 30
+    environment:
+      dataSourceDateLimit: '1970-01-01 00:00:00+00:00'
+    handler: functions/pooling_handler.get_data
+
+stepFunctions:
+  stateMachines:
+    poolingGetDataSteps:
+      events:
+        - schedule: 
+            name: ${self:custom.resourcesName}-steps-scheduler
+            rate: rate(1 minute)
+            enabled: false #disabled for the sake of saving resources while deploying this example
+            input:
+              variable: 'Example Input'
+      name: ${self:custom.resourcesName}-steps
+      definition:
+        StartAt: getData
+        TimeoutSeconds: 60 #must be the same as or less than the rate in which this event is scheduled to run if one wants to avoid parallel executions
+        States:
+          getData:
+            Type: Task
+            Resource: 
+              Fn::GetAtt:
+                - poolingGetData
+                - Arn
+            ResultPath: $.taskresult
+            Next: checkEventsRetrieved
+          checkEventsRetrieved:
+            Type: Choice
+            Choices:
+              -
+                Variable: $.taskresult
+                NumericGreaterThan: 0
+                Next: getData
+            Default: WorkflowEnd
+          WorkflowEnd:
+            Type: Pass
+            End: true
+
+
+package:
+  excludeDevDependencies: true
+  exclude:
+    - .env/**
+    - tests/**
+    - deploy/**
+    - downloads/**
+    - operational_coding/**
+    
+

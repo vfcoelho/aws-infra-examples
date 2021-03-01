@@ -1,0 +1,174 @@
+service: sls-examples-${self:custom.repoName}
+
+plugins:
+  - serverless-apigateway-service-proxy
+  
+custom:
+  repoName: hook
+  resourcesName: ${self:service}-${self:provider.stage}
+  apiGatewayServiceProxies:
+    - sqs:
+        path: /hook/receive_data
+        method: post
+        queueName: 
+          Fn::GetAtt: 
+            - HookReceiveDataQueue
+            - QueueName
+        cors: true
+        private: false
+        request:
+          template:
+            application/json:
+              Fn::Join:
+                - ''
+                - 
+                  - 'QueueUrl='
+                  - Ref: HookReceiveDataQueue
+                  - '&'
+                  - Action=SendMessage&
+                  - MessageBody=${file(deploy/api_mapping_template.vtl)}
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  # apiGateway:
+  #   apiKeySourceType: HEADER
+  #   apiKeys:
+  #     - 
+  #       description: slsExampleHookTestKey
+  #       value: sls_example_hook_test_key_value
+  #   usagePlan:
+  #       throttle:
+  #         burstLimit: 200
+  #         rateLimit: 100
+  logs:
+    restApi:
+      accessLogging: true
+      executionLogging: true
+      level: INFO
+      fullExecutionData: true
+  tracing: 
+    apiGateway: true
+    lambda: true
+  versionFunctions: false
+  environment:
+    stage: ${self:provider.stage}
+    region: ${self:provider.region}
+    repoName: ${self:service}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+        - ec2:CreateNetworkInterface
+        - ec2:DescribeNetworkInterfaces
+        - ec2:DeleteNetworkInterface
+        - xray:PutTraceSegments
+        - xray:PutTelemetryRecords
+      Resource: '*'
+    - Effect: Allow
+      Action:
+        - sns:Subscribe
+        - sqs:ReceiveMessage
+      Resource: '*'
+
+resources:
+  Resources:
+    HookReceiveDataQueueDeadLetter:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.resourcesName}-receive-data-dead-letter
+        MessageRetentionPeriod: 1209600
+
+    HookReceiveDataQueue:
+      Type: AWS::SQS::Queue
+      DependsOn: 
+        - HookReceiveDataQueueDeadLetter
+      Properties:
+        QueueName: ${self:custom.resourcesName}-receive-data-queue
+        VisibilityTimeout: 30
+        RedrivePolicy:
+          deadLetterTargetArn: 
+            Fn::GetAtt:
+              - HookReceiveDataQueueDeadLetter
+              - Arn
+          maxReceiveCount: 1
+    
+    HookReceiveDataTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: ${self:custom.resourcesName}-receive-data-topic
+
+    HookReceiveDataSubscription:
+      Type: AWS::SNS::Subscription
+      DependsOn: 
+        - HookReceiveDataQueue
+      Properties:
+        Protocol: sqs
+        Endpoint: 
+          Fn::GetAtt:
+            - HookReceiveDataQueue
+            - Arn
+        TopicArn: 
+          Ref: HookReceiveDataTopic
+        FilterPolicy: 
+          status: 
+            - ok
+    
+    SQSGeneralPolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - Ref: HookReceiveDataQueue
+        PolicyDocument:
+          Version: '2008-10-17'
+          Id: PublicationPolicy
+          Statement:
+            - Sid: Allow-SNS-SendMessage
+              Effect: Allow
+              Principal:
+                AWS: '*'
+              Action: 
+                - sqs:SendMessage
+              Resource: 
+                Fn::GetAtt:
+                  - HookReceiveDataQueue
+                  - Arn
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: 
+                    - Ref: HookReceiveDataTopic
+            
+
+functions:
+  hookReceiveData:
+    timeout: 30
+    handler: functions/hook_handler.receive_data
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - HookReceiveDataQueue
+              - Arn
+          batchSize: 1
+      # - http:
+      #     path: hook2
+      #     method: post
+      #     cors: true
+      #     private: true
+
+
+package:
+  excludeDevDependencies: true
+  exclude:
+    - .env/**
+    - tests/**
+    - deploy/**
+    - downloads/**
+    - operational_coding/**
+    - node_modules/**
+    
+

@@ -1,4 +1,11 @@
-.vscode/
+# My Custom Ignores
+node_modules/
+Pipfile.lock
+package-lock.json
+.serverless/
+.vscode
+vendored/
+requirements.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
